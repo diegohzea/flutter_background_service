@@ -45,6 +45,10 @@ class AndroidConfiguration {
   /// you must to create the notification channel before you run configure() method.
   final String? notificationChannelId;
 
+  /// Title of stop notification action
+  /// default to "Stop"
+  final String? stopServiceActionTitle;
+
   /// notification id will be used by foreground service
   final int foregroundServiceNotificationId;
 
@@ -56,6 +60,7 @@ class AndroidConfiguration {
     this.initialNotificationContent = 'Preparing',
     this.initialNotificationTitle = 'Background Service',
     this.notificationChannelId,
+    this.stopServiceActionTitle = 'Stop',
     this.foregroundServiceNotificationId = 112233,
   });
 }

@@ -43,6 +43,7 @@ import io.flutter.plugin.common.PluginRegistry;
 
 public class BackgroundService extends Service implements MethodChannel.MethodCallHandler {
     private static final String TAG = "BackgroundService";
+    static final String ACTION_STOP_SERVICE = "ActionStopService";
     private static final String LOCK_NAME = BackgroundService.class.getName()
             + ".Lock";
     public static volatile WakeLock lockStatic = null; // notice static
@@ -55,6 +56,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
     private String notificationTitle;
     private String notificationContent;
     private String notificationChannelId;
+    private String stopServiceActionTitle;
     private int notificationId;
     private Handler mainHandler;
 
@@ -100,6 +102,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
         notificationTitle = config.getInitialNotificationTitle();
         notificationContent = config.getInitialNotificationContent();
         notificationId = config.getForegroundNotificationId();
+        stopServiceActionTitle = config.getStopServiceActionTitle();
         updateNotificationInfo();
         onStartCommand(null, -1, -1);
     }
@@ -151,19 +154,26 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
         if (config.isForeground()) {
             String packageName = getApplicationContext().getPackageName();
             Intent i = getPackageManager().getLaunchIntentForPackage(packageName);
-
+            Intent serviceIntent = new Intent(this, BackgroundService.class);
+            serviceIntent.setAction(ACTION_STOP_SERVICE);
             int flags = PendingIntent.FLAG_CANCEL_CURRENT;
+            int pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 flags |= PendingIntent.FLAG_MUTABLE;
+                pendingFlags = PendingIntent.FLAG_IMMUTABLE;
             }
 
             PendingIntent pi = PendingIntent.getActivity(BackgroundService.this, 11, i, flags);
+            PendingIntent closeOverlayPendingIntent = PendingIntent.getService(this, 0, serviceIntent, pendingFlags);
+
             NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, notificationChannelId)
                     .setSmallIcon(R.drawable.ic_bg_service_small)
                     .setAutoCancel(true)
                     .setOngoing(true)
                     .setContentTitle(notificationTitle)
                     .setContentText(notificationContent)
+                    .addAction(0, stopServiceActionTitle, closeOverlayPendingIntent)
+                    .setSilent(true)
                     .setContentIntent(pi);
 
             startForeground(notificationId, mBuilder.build());
@@ -172,6 +182,13 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_STOP_SERVICE.equals(intent.getAction())) {
+            isManuallyStopped = true;
+            config.setManuallyStopped(true);
+            WatchdogReceiver.remove(this);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         config.setManuallyStopped(false);
         WatchdogReceiver.enqueue(this);
         runService();
@@ -307,7 +324,7 @@ public class BackgroundService extends Service implements MethodChannel.MethodCa
 
             if (method.equalsIgnoreCase("sendData")) {
                 try {
-                    if (FlutterBackgroundServicePlugin.mainPipe.hasListener()){
+                    if (FlutterBackgroundServicePlugin.mainPipe.hasListener()) {
                         FlutterBackgroundServicePlugin.mainPipe.invoke((JSONObject) call.arguments);
                     }
 

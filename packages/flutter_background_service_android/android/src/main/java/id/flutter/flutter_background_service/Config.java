@@ -70,6 +70,14 @@ public class Config {
         pref.edit().putString("notification_channel_id", value).apply();
     }
 
+    public void setStopServiceActionTitle(String value) {
+        pref.edit().putString("stop_service_action_title", value).apply();
+    }
+
+    public String getStopServiceActionTitle() {
+        return pref.getString("stop_service_action_title", "Stop");
+    }
+
     public int getForegroundNotificationId() {
         return pref.getInt("foreground_notification_id", 112233);
     }
